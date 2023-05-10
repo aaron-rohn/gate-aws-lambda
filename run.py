@@ -3,21 +3,21 @@ import boto3
 import json
 import asyncio
 
-async def invoke(client, **kwds):
+async def invoke(client, i, **payload):
+    print(i)
     loop = asyncio.get_running_loop()
-    response = await loop.run_in_executor(None, lambda: client.invoke(**kwds))
-    #response_pld = json.loads(response['Payload'].read())
-    return response
-
-async def launch(client, i, **payload):
     payload['output'] = f'output_{i}'
-    return await invoke(client,
-                        FunctionName = 'gate',
-                        Payload = json.dumps(payload))
 
-async def aggregate(client, **payload):
-    results = await asyncio.gather(*[launch(client, i, **payload) for i in range(3)])
-    print(results)
+    aws_lambda_call = lambda: client.invoke(
+            FunctionName = 'gate', Payload = json.dumps(payload))
+
+    return await loop.run_in_executor(None, aws_lambda_call)
+
+async def launch(client, **payload):
+    results = await asyncio.gather(*[invoke(client, i, **payload) for i in range(3)])
+
+    for r in results:
+        print(json.loads(r['Payload'].read()))
 
 sess = boto3.Session(profile_name = 'godinez')
 lambda_client = sess.client('lambda')
@@ -29,9 +29,4 @@ pld = {'bucket': 'ucd-godinez-gate',
         'output': '',
         'cmd': ''}
 
-asyncio.run(aggregate(lambda_client, **pld))
-
-#response = lambda_client.invoke(
-#        FunctionName = 'gate', Payload = json.dumps(pld))
-#response_pld = json.loads(response['Payload'].read())
-#print(response_pld)
+asyncio.run(launch(lambda_client, **pld))
