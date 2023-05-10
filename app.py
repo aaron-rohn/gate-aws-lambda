@@ -33,39 +33,37 @@ def handler(event, context):
     logging.info(f'Output: {bucket}/{obj_out}')
     logging.info(f'Run \'{gate_cmd}\' and store results to \'{results}\'')
 
-    td = tempfile.TemporaryDirectory()
-    os.chdir(td.name)
-    os.makedirs(results)
+    with tempfile.TemporaryDirectory() as td:
+        os.chdir(td)
+        os.makedirs(results)
 
-    try:
-        s3.download_file(bucket, obj_in, 'files.zip')
-        shutil.unpack_archive('files.zip')
-    except Exception as e:
-        logging.exception('Failed to download or unpack specified archive')
-        return {'message': f'Error retrieving files ({e})'}
+        try:
+            s3.download_file(bucket, obj_in, 'files.zip')
+            shutil.unpack_archive('files.zip')
+        except Exception as e:
+            logging.exception('Failed to download or unpack specified archive')
+            return {'message': f'Error retrieving files ({e})'}
 
-    logging.info(f'Archive contents: {os.listdir()}')
+        logging.info(f'Archive contents: {os.listdir()}')
 
-    timeout = context.get_remaining_time_in_millis() / 1000
-    timeout = None if timeout <= 1 else timeout - 1
+        timeout = context.get_remaining_time_in_millis() / 1000
+        timeout = None if timeout <= 1 else timeout - 1
 
-    try:
-        subprocess.run(cmd, timeout = timeout)
-    except subprocess.TimeoutExpired:
-        logging.exception('Simulation process timed out')
-        return {'message': 'Timeout expired, process killed'}
-    except subprocess.CalledProcessError as e:
-        logging.exception('Simulation returned non-zero exit code')
-        return {'message': f'Command returned with non-zero exit ({e})'}
+        try:
+            subprocess.run(cmd, timeout = timeout)
+        except subprocess.TimeoutExpired:
+            logging.exception('Simulation process timed out')
+            return {'message': 'Timeout expired, process killed'}
+        except subprocess.CalledProcessError as e:
+            logging.exception('Simulation returned non-zero exit code')
+            return {'message': f'Command returned with non-zero exit ({e})'}
 
-    logging.info(f'Files generated: {os.listdir(results)}')
+        logging.info(f'Files generated: {os.listdir(results)}')
 
-    for root, dirs, files in os.walk(results):
-        for name in files:
-            s3.upload_file(
-                    os.path.join(root, name),
-                    bucket, os.path.join(obj_out, name))
+        for root, dirs, files in os.walk(results):
+            for name in files:
+                s3.upload_file(
+                        os.path.join(root, name),
+                        bucket, os.path.join(obj_out, name))
 
-    os.chdir('/')
-    td.cleanup()
     return {'message': f'{bucket}/{obj_out}'}
