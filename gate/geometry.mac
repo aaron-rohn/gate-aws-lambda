@@ -1,0 +1,118 @@
+#=====================================================
+# GEOMETRY of mCT scanner
+#=====================================================
+
+#     W O R L D
+/gate/world/geometry/setXLength       100. cm
+/gate/world/geometry/setYLength       100. cm
+/gate/world/geometry/setZLength       100. cm
+/gate/world/vis/setVisible false
+
+# whole
+/gate/world/daughters/name                    cylindricalPET
+/gate/world/daughters/insert                  cylinder
+/gate/cylindricalPET/placement/setTranslation     0.0 0.0 0.0 mm   
+/gate/cylindricalPET/geometry/setRmax             70.93  mm
+/gate/cylindricalPET/geometry/setRmin             50.93  mm
+/gate/cylindricalPET/geometry/setHeight           79.0 mm
+/gate/cylindricalPET/setMaterial                  Air
+/gate/cylindricalPET/vis/forceWireframe
+/gate/cylindricalPET/vis/setColor                 white
+
+## Tungsten shield
+#/gate/world/daughters/name               carter1
+#/gate/world/daughters/insert             cylinder
+#/gate/carter1/setMaterial                Tungsten
+#/gate/carter1/geometry/setRmax           70.93  mm
+#/gate/carter1/geometry/setRmin           50.93  mm
+#/gate/carter1/geometry/setHeight         10.0   mm
+#/gate/carter1/placement/setTranslation   0.0 0.0 -44.5 mm
+#/gate/carter1/vis/forceSolid
+#/gate/carter1/vis/setColor grey
+#
+## Tungsten shield
+#/gate/world/daughters/name               carter2
+#/gate/world/daughters/insert             cylinder
+#/gate/carter2/setMaterial                Tungsten
+#/gate/carter2/geometry/setRmax           70.93  mm
+#/gate/carter2/geometry/setRmin           50.93  mm
+#/gate/carter2/geometry/setHeight         10.0    mm
+#/gate/carter2/placement/setTranslation   0.0 0.0 44.5 mm
+#/gate/carter2/vis/setColor grey
+#/gate/carter2/vis/forceWireframe
+
+# head
+/gate/cylindricalPET/daughters/name           head
+/gate/cylindricalPET/daughters/insert         box
+/gate/head/placement/setTranslation           60.93 0.0 0.0 mm
+/gate/head/geometry/setXLength                20.0 mm
+/gate/head/geometry/setYLength                19.0 mm
+/gate/head/geometry/setZLength                79.0 mm
+/gate/head/setMaterial                        Air
+/gate/head/vis/setColor		              blue
+#/gate/head/vis/setVisible                    false
+
+# block
+/gate/head/daughters/name                     block
+/gate/head/daughters/insert                   box
+/gate/block/placement/setTranslation          0.0 0.0 0.0 mm   # in relative to the head
+/gate/block/geometry/setXLength               20 mm
+/gate/block/geometry/setYLength               19.0 mm  
+/gate/block/geometry/setZLength               19.0 mm  
+/gate/block/setMaterial                       Air
+#/gate/block/vis/setVisible                   false
+/gate/block/vis/setColor                      red
+/gate/block/vis/forceWireframe
+
+# crystal
+/gate/block/daughters/name                    crystal
+/gate/block/daughters/insert                  box
+/gate/crystal/placement/setTranslation        0.0 0.0 0.0 mm
+/gate/crystal/geometry/setXLength             20 mm
+/gate/crystal/geometry/setYLength             0.93 mm
+/gate/crystal/geometry/setZLength             0.93 mm
+/gate/crystal/setMaterial                     Air
+/gate/crystal/vis/setVisible                  false
+/gate/crystal/vis/forceSolid
+
+# crystal-LYSO
+/gate/crystal/daughters/name                  LYSO
+/gate/crystal/daughters/insert                box
+/gate/LYSO/placement/setTranslation           0.0 0.0 0.0 mm
+/gate/LYSO/geometry/setXLength                20 mm
+/gate/LYSO/geometry/setYLength                0.93 mm
+/gate/LYSO/geometry/setZLength                0.93 mm
+/gate/LYSO/setMaterial                        LYSO
+/gate/LYSO/vis/setColor                       yellow
+/gate/LYSO/vis/forceWireframe
+/gate/LYSO/vis/setVisible 		      true
+
+
+# Repeater for crystal
+/gate/crystal/repeaters/insert                cubicArray
+/gate/crystal/cubicArray/setRepeatNumberX     1
+/gate/crystal/cubicArray/setRepeatNumberY     19
+/gate/crystal/cubicArray/setRepeatNumberZ     19
+/gate/crystal/cubicArray/setRepeatVector      0.0 1.0 1.0 mm 
+
+# Repeater for block
+/gate/block/repeaters/insert                cubicArray
+/gate/block/cubicArray/setRepeatNumberX     1
+/gate/block/cubicArray/setRepeatNumberY     1
+/gate/block/cubicArray/setRepeatNumberZ     4
+/gate/block/cubicArray/setRepeatVector      0.0 0.0 19.75 mm 
+
+# Repeater for head
+/gate/head/repeaters/insert        ring
+/gate/head/ring/setRepeatNumber    16   
+
+
+# Attach system
+/gate/systems/cylindricalPET/rsector/attach  head
+/gate/systems/cylindricalPET/module/attach   block
+/gate/systems/cylindricalPET/crystal/attach  crystal
+/gate/systems/cylindricalPET/layer0/attach   LYSO
+
+# Attach crystal SD
+/gate/LYSO/attachCrystalSD
+

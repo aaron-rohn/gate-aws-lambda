@@ -1,0 +1,25 @@
+/vis/disable
+
+#/control/execute verbose.mac
+/gate/geometry/setMaterialDatabase GateMaterials.db
+/control/execute geometry.mac
+
+/gate/physics/addPhysicsList emstandard
+/gate/physics/addProcess RadioactiveDecay
+
+/gate/run/initialize
+
+/control/execute digitizer.mac
+/control/execute pointsource.mac
+/control/execute output.mac
+
+/gate/random/setEngineName MersenneTwister
+/gate/random/setEngineSeed auto
+#/gate/random/verbose 0
+
+/gate/application/setTimeSlice   {duration}  s
+/gate/application/setTimeStart   0  s
+/gate/application/setTimeStop    {duration}  s
+/gate/application/startDAQ
+
+exit

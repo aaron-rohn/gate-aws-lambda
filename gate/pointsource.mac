@@ -1,0 +1,14 @@
+/gate/source/addSource F18
+/gate/source/F18/gps/type Volume
+/gate/source/F18/gps/shape Sphere
+/gate/source/F18/gps/radius 100.0 micrometer 
+/gate/source/F18/gps/centre {x} {y} {z} mm  
+/gate/source/F18/setActivity {activity} Bq
+
+/gate/source/F18/gps/particle gamma
+/gate/source/F18/setType backtoback
+/gate/source/F18/gps/monoenergy 511. keV
+/gate/source/F18/gps/angtype iso
+/gate/source/F18/setAccolinearityFlag True
+/gate/source/F18/setForcedUnstableFlag true
+/gate/source/F18/setForcedHalfLife 6586 s
