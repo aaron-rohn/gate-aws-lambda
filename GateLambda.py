@@ -3,20 +3,39 @@ import os
 import json
 import asyncio
 import shutil
+import queue
+import logging
 
-async def invoke(client, **payload):
+async def invoke(client, function = 'gate', **payload):
     aws_lambda_call = lambda: client.invoke(
-            FunctionName = 'gate', Payload = json.dumps(payload))
+            FunctionName = function, Payload = json.dumps(payload))
+
     loop = asyncio.get_running_loop()
     return await loop.run_in_executor(None, aws_lambda_call)
 
-async def launch(client, instances, **payload):
+async def launch(client, instances, max_concurrent = 1000, **payload):
     """ instances is a list of dict with {'output': ..., 'cmd': ...} """
-    async with asyncio.TaskGroup() as tg:
-        tsk = [tg.create_task(
-            invoke(client, **payload, **inst)) for inst in instances]
 
-    results = [t.result() for t in tsk]
+    # AWS default max concurrency for lambda is 1000 instances (per account)
+    # additional concurrent requests will fail
+    tasks = queue.Queue(maxsize = max_concurrent)
+    results = []
+
+    logging.info(f'Launch {len(instances)} instances with max concurrency of {max_concurrent}')
+
+    async with asyncio.TaskGroup() as tg:
+        for inst in instances:
+            if tasks.full():
+                # wait for the oldest task to complete
+                results.append(await tasks.get())
+
+            logging.info(f'Launch instance: {inst}')
+            tsk = tg.create_task(invoke(client, **payload, **inst))
+            tasks.put(tsk)
+
+    while not tasks.empty():
+        results.append(await tasks.get())
+
     return [json.loads(r['Payload'].read()) for r in results]
 
 def create_cmd_str(**pars):
@@ -34,12 +53,15 @@ def upload_gate_dir(s3, dirname, bucket, obj_prefix = '', fmt = 'zip'):
     zipname = f'{zipname}.{fmt}'
     objname = os.path.join(obj_prefix, zipname)
 
+    logging.info(f'Upload {dirname} to {bucket}/{obj_prefix} as {zipname}')
     s3.upload_file(zipname, bucket, objname)
     return objname
 
 def download_gate_dir(s3, bucket, prefix, local_dir = ''):
+    logging.info(f'Download {bucket}/{prefix} to {local_dir or "."}')
     objs = s3.list_objects_v2(Bucket = bucket, Prefix = prefix)
 
+    # each result dir should contain the gate output log and one or more data files
     for obj in objs['Contents']:
         objname = obj['Key']
         target = os.path.join(local_dir, objname)
@@ -50,12 +72,14 @@ def download_gate_dir(s3, bucket, prefix, local_dir = ''):
         if objname[-1] != '/':
             s3.download_file(bucket, objname, target)
 
-def download_results_dirs(s3, bucket, results):
+def download_results(s3, bucket, results):
     for r in results:
+        # return value should be {message: bucket/prefix} if no error
         outdir = r['message']
+
         if re.match(bucket, outdir):
-            print(f'Downloading results: {outdir}')
             download_gate_dir(s3, bucket,
                               os.path.relpath(outdir, bucket))
         else:
-            print(f'Lambda returned with error: {outdir}')
+            # lambda will indicate what error occurred
+            logging.error(f'Lambda returned with error: {outdir}')

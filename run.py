@@ -2,40 +2,60 @@
 
 import boto3
 import asyncio
+import logging
 
 import GateLambda
 
-if __name__ == "__main__":
-    sess = boto3.Session(profile_name = 'godinez')
-    lambda_client = sess.client('lambda')
-    s3_client = sess.client('s3')
+logging.basicConfig(level = logging.INFO)
 
-    bucket = 'ucd-godinez-gate'
-    gate_macro_dir = './gate'
-    gate_main_macro = 'main.mac'
-    gate_output_dir = 'output'
+sess = boto3.Session(profile_name = 'godinez')
+lambda_client = sess.client('lambda')
+s3_client = sess.client('s3')
 
-    obj_name = GateLambda.upload_gate_dir(
-            s3_client, gate_macro_dir, bucket)
+# the s3 bucket for storing inputs and outputs
+bucket = 'ucd-godinez-gate'
 
-    pld = {'bucket':    bucket,
-           'main':      gate_main_macro,
-           'results':   gate_output_dir,
-           'input':     obj_name}
+# the local directory containing all the necessary gate macros
+gate_macro_dir = './gate'
 
-    results_dir_fmt = 'output_{}'
+# the name of the main macro
+gate_main_macro = 'main.mac'
 
-    cmd_str = GateLambda.create_cmd_str(
-            activity = 1000,
-            duration = 1,
-            x = 0.0,
-            y = 0.0,
-            z = 0.0)
+# the folder that the gate macros expect to store results
+gate_output_dir = 'output'
 
-    instances = []
-    for i in range(2):
-        instances.append({'output': results_dir_fmt.format(i),
-                          'cmd': cmd_str})
 
-    results = asyncio.run(GateLambda.launch(lambda_client, instances, **pld))
-    GateLambda.download_results_dirs(s3_client, bucket, results)
+# zip and upload the local macro directory to s3
+# returns the path to the file with the lambda will download
+obj_name = GateLambda.upload_gate_dir(
+        s3_client, gate_macro_dir, bucket)
+
+# mandatory parameters for the lambda function, which are
+# constant across all invocations
+pld = {'bucket':    bucket,
+       'main':      gate_main_macro,
+       'results':   gate_output_dir,
+       'input':     obj_name}
+
+# create the varying parameters passed to each instance of lambda
+
+results_dir_fmt = 'output_{}'
+
+cmd_str = GateLambda.create_cmd_str(
+        activity = 1000,
+        duration = 10,
+        x = 0.0,
+        y = 0.0,
+        z = 0.0)
+
+instances = []
+for i in range(5):
+    instances.append({'output': results_dir_fmt.format(i),
+                      'cmd': cmd_str})
+
+# invoke lambda and download results
+
+results = asyncio.run(
+        GateLambda.launch(lambda_client, instances, **pld))
+
+GateLambda.download_results(s3_client, bucket, results)
