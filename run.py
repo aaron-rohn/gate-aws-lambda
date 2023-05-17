@@ -3,6 +3,7 @@
 import boto3
 import asyncio
 import logging
+import datetime
 
 import GateLambda
 
@@ -39,7 +40,8 @@ pld = {'bucket':    bucket,
 
 # create the varying parameters passed to each instance of lambda
 
-results_dir_fmt = 'output_{}'
+prefix_dir = datetime.datetime.now().isoformat(timespec = 'seconds')
+results_dir_fmt = f'run_{prefix_dir}/output_{{}}'
 
 cmd_str = GateLambda.create_cmd_str(
         activity = 1000,
@@ -50,8 +52,11 @@ cmd_str = GateLambda.create_cmd_str(
 
 instances = []
 for i in range(5):
-    instances.append({'output': results_dir_fmt.format(i),
-                      'cmd': cmd_str})
+    output_name_i = results_dir_fmt.format(i)
+    cmd_str_i = cmd_str
+
+    instances.append({'output': output_name_i,
+                      'cmd': cmd_str_i})
 
 # invoke lambda and download results
 
