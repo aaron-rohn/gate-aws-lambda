@@ -29,7 +29,7 @@ async def launch(client, instances, max_concurrent = 1000, **payload):
                 # wait for the oldest task to complete
                 results.append(await tasks.get())
 
-            logging.info(f'Launch instance: {inst}')
+            logging.debug(f'Launch instance: {inst}')
             tsk = tg.create_task(invoke(client, **payload, **inst))
             tasks.put(tsk)
 
@@ -57,8 +57,8 @@ def upload_gate_dir(s3, dirname, bucket, obj_prefix = '', fmt = 'zip'):
     s3.upload_file(zipname, bucket, objname)
     return objname
 
-def download_gate_dir(s3, bucket, prefix, local_dir = ''):
-    logging.info(f'Download {bucket}/{prefix} to {local_dir or "."}')
+def download_gate_dir(s3, bucket, prefix, local_dir = '', cleanup = False):
+    logging.debug(f'Download {bucket}/{prefix} to {local_dir or "."}')
     objs = s3.list_objects_v2(Bucket = bucket, Prefix = prefix)
 
     # each result dir should contain the gate output log and one or more data files
@@ -70,16 +70,32 @@ def download_gate_dir(s3, bucket, prefix, local_dir = ''):
             os.makedirs(os.path.dirname(target))
 
         if objname[-1] != '/':
-            s3.download_file(bucket, objname, target)
+            try:
+                s3.download_file(bucket, objname, target)
+                if cleanup:
+                    s3.delete_object(Bucket = bucket, Key = objname)
+            except Exception as e:
+                logging.exception(e)
 
-def download_results(s3, bucket, results):
+def download_results(s3, bucket, results, cleanup = False):
+    logging.info(f'Download results from {len(results)} instances')
+
     for r in results:
         # return value should be {message: bucket/prefix} if no error
         outdir = r['message']
 
         if re.match(bucket, outdir):
-            download_gate_dir(s3, bucket,
-                              os.path.relpath(outdir, bucket))
+            download_gate_dir(s3,
+                              bucket,
+                              os.path.relpath(outdir, bucket),
+                              cleanup = cleanup)
         else:
             # lambda will indicate what error occurred
             logging.error(f'Lambda returned with error: {outdir}')
+
+def cleanup_objects(s3, bucket, *keys):
+    for key in keys:
+        try:
+            s3.delete_object(Bucket = bucket, Key = key)
+        except Exception as e:
+            logging.exception(e)
