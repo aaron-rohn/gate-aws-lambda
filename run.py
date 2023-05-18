@@ -41,30 +41,16 @@ pld = {'bucket':    bucket,
        'input':     obj_name}
 
 # create the varying parameters passed to each instance of lambda
+instances = GateLambda.create_cmd_str(
+        output_prefix = s3_prefix_dir,
+        runs = 2,
+        activity = 1000,
+        duration = 1,
+        x = range(2),
+        y = range(2),
+        z = range(2))
 
-results_dir_fmt = f'{s3_prefix_dir}/x{{}}_y{{}}_z{{}}'
-
-xrange = range(-10, 11, 20)
-yrange = range(-10, 11, 20)
-zrange = range(-10, 11, 20)
-
-pos = [(x, y, z) for x in xrange for y in yrange for z in zrange]
-logging.info(f'Initialize {len(pos)} runs')
-
-instances = []
-for x, y, z in pos:
-    output_name_i = results_dir_fmt.format(x,y,z)
-
-    cmd_str = GateLambda.create_cmd_str(
-            activity = 1000,
-            duration = 1,
-            x = x, y = y, z = z)
-
-    instances.append({'output': output_name_i,
-                      'cmd': cmd_str})
-
-# invoke lambda and download results
-
+# invoke lambda for each instance
 results = asyncio.run(
         GateLambda.launch(lambda_client, instances, **pld))
 
