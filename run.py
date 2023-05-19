@@ -27,20 +27,10 @@ gate_output_dir = 'output'
 
 # unique s3 prefix for files during computation
 s3_prefix_dir = datetime.datetime.now().isoformat(timespec = 'seconds')
-
-# zip and upload the local macro directory to s3
-# returns the path to the file with the lambda will download
-obj_name = GateLambda.upload_gate_dir(
-        s3_client, gate_macro_dir, bucket, s3_prefix_dir)
-
-# mandatory parameters for the lambda function, which are
-# constant across all invocations
-pld = {'bucket':    bucket,
-       'main':      gate_main_macro,
-       'results':   gate_output_dir,
-       'input':     obj_name}
+logging.info(f'Using s3 prefix directory: {s3_prefix_dir}')
 
 # create the varying parameters passed to each instance of lambda
+# each 'instance' is a dict with {output: ..., cmd: ...}
 instances = GateLambda.create_cmd_str(
         output_prefix = s3_prefix_dir,
         runs = 2,
@@ -50,10 +40,23 @@ instances = GateLambda.create_cmd_str(
         y = range(2),
         z = range(2))
 
+
+# zip and upload the local macro directory to s3
+# returns the path to the file with the lambda will download
+gate_s3_zip = GateLambda.upload_gate_dir(
+        s3_client, gate_macro_dir, bucket, s3_prefix_dir)
+
+# mandatory parameters for the lambda function, which are
+# constant across all invocations
+pld = {'bucket':    bucket,
+       'main':      gate_main_macro,
+       'results':   gate_output_dir,
+       'input':     gate_s3_zip}
+
 # invoke lambda for each instance
 results = asyncio.run(
         GateLambda.launch(lambda_client, instances, **pld))
 
 # download results and remove from s3
 GateLambda.download_results(s3_client, bucket, results, cleanup = True)
-GateLambda.cleanup_objects(s3_client, bucket, obj_name)
+GateLambda.cleanup_objects(s3_client, bucket, gate_s3_zip)

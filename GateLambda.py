@@ -42,6 +42,21 @@ async def launch(client, instances, max_concurrent = 1000, **payload):
     return [json.loads(r['Payload'].read()) for r in results]
 
 def create_cmd_str(output_prefix = None, runs = 1, **pars):
+    """
+    Create all possible combinations of gate input parameters and replicate `run`
+    times. Parameters can either be a scalar or an iterable. The outer product
+    of all iterables is used to create the combinations of parameters used
+    to invoke lambda instances.
+
+    The output name format will include each parameter name and the value used
+    for the lambda infocation.
+
+    Note that gate parameters must not include 'runs' or 'output_prefix'
+    """
+
+    if not isinstance(runs, int) or runs < 1:
+        raise RuntimeError(f'runs must be an int greater than 0, got {runs}')
+
     range_items = {'run': range(runs)}
     const_items = {}
 
@@ -60,11 +75,13 @@ def create_cmd_str(output_prefix = None, runs = 1, **pars):
     for comb in outer_prod:
         inst = dict(zip(range_items.keys(), comb)) | const_items
 
+        # create the output folder name for this combination of pars
         out = [f'{k}{v}' for k,v in inst.items()]
         out = '_'.join(out)
         if output_prefix is not None:
             out = os.path.join(output_prefix, out)
 
+        # create the gate command string for this combination of pars
         cmd = [f'[{k},{v}]' for k,v in inst.items() if k != 'run']
         if len(cmd) > 0:
             cmd = ''.join(cmd)
