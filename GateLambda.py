@@ -6,6 +6,7 @@ import shutil
 import queue
 import logging
 import itertools
+import datetime
 
 from collections.abc import Iterable
 
@@ -25,6 +26,7 @@ async def launch(client, instances, max_concurrent = 1000, **payload):
     results = []
 
     logging.info(f'Launch {len(instances)} instances with max concurrency of {max_concurrent}')
+    start = datetime.datetime.now()
 
     async with asyncio.TaskGroup() as tg:
         for inst in instances:
@@ -32,14 +34,16 @@ async def launch(client, instances, max_concurrent = 1000, **payload):
                 # wait for the oldest task to complete
                 results.append(await tasks.get())
 
-            logging.info(f'Launch instance: {inst}')
+            #logging.info(f'Launch instance: {inst}')
             tsk = tg.create_task(invoke(client, **payload, **inst))
             tasks.put(tsk)
 
     while not tasks.empty():
         results.append(await tasks.get())
 
-    return [json.loads(r['Payload'].read()) for r in results]
+    elapsed = datetime.datetime.now() - start
+    results = [json.loads(r['Payload'].read()) for r in results]
+    return elapsed, results
 
 def create_cmd_str(output_prefix = None, runs = 1, **pars):
     """
@@ -128,7 +132,11 @@ def download_results(s3, bucket, results, cleanup = False):
 
     for r in results:
         # return value should be {message: bucket/prefix} if no error
-        outdir = r['message']
+        try:
+            outdir = r['message']
+        except KeyError:
+            logging.error(f'Error in Lambda evaluation: {r}')
+            continue
 
         if re.match(bucket, outdir):
             download_gate_dir(s3,
